@@ -8,10 +8,10 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; padding: 2rem 1rem; }
   .container { max-width: 720px; margin: 0 auto; }
-  h1 { font-size: 20px; font-weight: 500; margin-bottom: 1.5rem; color: #1a1a1a; }
+  h1 { font-size: 20px; font-weight: 500; margin-bottom: 1.5rem; }
   .card { background: #fff; border: 0.5px solid #e0e0e0; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; }
   label { display: block; font-size: 12px; color: #888; margin-bottom: 5px; }
-  input[type="text"], input[type="date"], input[type="password"] {
+  input[type="text"], input[type="date"] {
     width: 100%; height: 36px; padding: 0 10px; font-size: 13px;
     border: 0.5px solid #ddd; border-radius: 8px; background: #fff;
     color: #1a1a1a; font-family: inherit; outline: none;
@@ -43,7 +43,6 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   #loading { display: none; align-items: center; gap: 8px; font-size: 13px; color: #888; padding: 1rem 0; }
   #output { display: none; }
-  .api-note { font-size: 12px; color: #aaa; margin-top: 6px; }
   .action-item { margin-bottom: 8px; }
   .action-meta { font-size: 12px; color: #aaa; margin-top: 2px; }
 </style>
@@ -51,12 +50,6 @@
 <body>
 <div class="container">
   <h1>회의록 정리기</h1>
-
-  <div class="card">
-    <label>Anthropic API 키</label>
-    <input type="password" id="api-key" placeholder="sk-ant-...">
-    <p class="api-note">키는 브라우저에만 저장되며 서버로 전송되지 않아요.</p>
-  </div>
 
   <div class="card">
     <div class="meta-row">
@@ -95,17 +88,8 @@
 <script>
   document.getElementById('meeting-date').value = new Date().toISOString().split('T')[0];
 
-  // API 키 로컬 저장
-  const savedKey = localStorage.getItem('anthropic_api_key');
-  if (savedKey) document.getElementById('api-key').value = savedKey;
-  document.getElementById('api-key').addEventListener('change', e => {
-    localStorage.setItem('anthropic_api_key', e.target.value.trim());
-  });
-
   async function summarize() {
-    const apiKey = document.getElementById('api-key').value.trim();
     const raw = document.getElementById('raw-minutes').value.trim();
-    if (!apiKey) { alert('API 키를 입력해주세요.'); return; }
     if (!raw) { alert('회의 내용을 입력해주세요.'); return; }
 
     const title = document.getElementById('meeting-title').value.trim();
@@ -122,7 +106,7 @@
       attendees ? `참석자: ${attendees}` : ''
     ].filter(Boolean).join('\n');
 
-    const prompt = `다음 회의 내용을 아래 형식으로 정리해줘. 반드시 JSON만 반환하고 다른 텍스트는 절대 포함하지 마.
+    const prompt = `다음 회의 내용을 아래 형식으로 정리해줘. 반드시 JSON만 반환하고 마크다운 코드블록이나 다른 텍스트는 절대 포함하지 마.
 
 ${metaPart ? '【메타 정보】\n' + metaPart + '\n\n' : ''}【회의 내용】
 ${raw}
@@ -138,26 +122,14 @@ ${raw}
 }`;
 
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('/api/summarize', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-request-origin': 'user-provided-key'
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          messages: [{ role: 'user', content: prompt }]
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
       });
       const data = await res.json();
-      if (data.error) throw new Error(data.error.message);
-      const text = data.content.map(c => c.text || '').join('');
-      const clean = text.replace(/```json|```/g, '').trim();
-      const parsed = JSON.parse(clean);
-      renderResult(parsed, { title, date, attendees });
+      if (data.error) throw new Error(data.error);
+      renderResult(data, { title, date, attendees });
     } catch(e) {
       alert('오류: ' + e.message);
       document.getElementById('summarize-btn').disabled = false;
@@ -176,7 +148,6 @@ ${raw}
 
     const body = document.getElementById('result-body');
     let html = '';
-
     if (data.summary) html += block('요약', `<p class="result-text">${data.summary}</p>`);
     if (data.agenda?.length) html += block('안건', list(data.agenda));
     if (data.decisions?.length) html += block('결정사항', list(data.decisions));
@@ -209,6 +180,7 @@ ${raw}
     document.getElementById('meeting-attendees').value = '';
     document.getElementById('output').style.display = 'none';
     document.getElementById('reset-btn').style.display = 'none';
+    document.getElementById('header-info').style.display = 'flex';
   }
   function copyResult() {
     const card = document.getElementById('result-card');
