@@ -38,10 +38,10 @@
   #loading { display: none; align-items: center; gap: 8px; font-size: 13px; color: #888; padding: 1rem 0; }
   #output { display: none; }
   .result-pre { font-family: inherit; font-size: 14px; line-height: 1.8; white-space: pre-wrap; word-break: break-word; }
-  .topic-block { margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 0.5px solid #eee; }
+  .topic-block { margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 0.5px solid #eee; }
   .topic-block:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
   .topic-num { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
-  .sub-item { margin-left: 1rem; margin-bottom: 4px; font-size: 14px; line-height: 1.7; }
+  .sub-item { margin-left: 1rem; margin-bottom: 4px; margin-top: 10px; font-size: 14px; line-height: 1.7; }
   .detail-item { margin-left: 2rem; margin-bottom: 3px; font-size: 13px; line-height: 1.7; color: #444; }
   .key-point { margin-left: 1rem; margin-top: 6px; padding: 6px 10px; background: #faf8f5; border-left: 3px solid #d4a574; font-size: 13px; line-height: 1.6; color: #333; border-radius: 0 6px 6px 0; }
   .summary-section { margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 0.5px solid #eee; }
@@ -52,6 +52,13 @@
   .action-task { flex: 1; }
   .action-owner { color: #888; white-space: nowrap; }
   .action-due { color: #888; white-space: nowrap; }
+  .label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+  .label-row label { margin-bottom: 0; }
+  .mic-btn { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; font-size: 12px; border-radius: 6px; border: 0.5px solid #ddd; background: #fff; color: #888; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+  .mic-btn:hover { background: #f5f5f3; }
+  .mic-btn.recording { background: #fee; border-color: #e88; color: #c44; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+  .mic-status { font-size: 11px; color: #aaa; margin-top: 4px; min-height: 16px; }
 </style>
 </head>
 <body>
@@ -73,8 +80,12 @@
         <input type="text" id="meeting-attendees" placeholder="예: 민지, 지훈">
       </div>
     </div>
-    <label>회의 내용</label>
-    <textarea id="raw-minutes" placeholder="회의 내용을 붙여넣으세요. 날것의 메모, 대화록 등 어떤 형태도 OK."></textarea>
+    <div class="label-row">
+      <label>회의 내용</label>
+      <button class="mic-btn" id="mic-btn" onclick="toggleMic()">🎙️ 음성 입력</button>
+    </div>
+    <textarea id="raw-minutes" placeholder="회의 내용을 붙여넣거나, 🎙️ 음성 입력 버튼을 눌러 말해보세요."></textarea>
+    <div class="mic-status" id="mic-status"></div>
     <div class="btn-row">
       <button class="btn" id="summarize-btn" onclick="summarize()">✦ 회의록 정리하기</button>
       <button class="btn" id="reset-btn" onclick="reset()" style="display:none">↺ 다시 입력</button>
@@ -249,6 +260,73 @@ ${raw}
       btn.textContent = '✓ 복사됨';
       setTimeout(() => { btn.textContent = '⎘ 전체 복사'; }, 1500);
     });
+  }
+  // 음성 인식
+  let recognition = null;
+  let isRecording = false;
+
+  function toggleMic() {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('이 브라우저에서는 음성 인식을 지원하지 않아요. Chrome 브라우저를 사용해주세요.');
+      return;
+    }
+
+    if (isRecording) {
+      stopMic();
+    } else {
+      startMic();
+    }
+  }
+
+  function startMic() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.lang = 'ko-KR';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    const textarea = document.getElementById('raw-minutes');
+    const startText = textarea.value;
+    let finalTranscript = '';
+
+    recognition.onresult = (e) => {
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const transcript = e.results[i][0].transcript;
+        if (e.results[i].isFinal) {
+          finalTranscript += transcript + ' ';
+        } else {
+          interim = transcript;
+        }
+      }
+      textarea.value = startText + (startText ? '\n' : '') + finalTranscript + interim;
+      textarea.scrollTop = textarea.scrollHeight;
+    };
+
+    recognition.onend = () => {
+      if (isRecording) recognition.start();
+    };
+
+    recognition.onerror = (e) => {
+      if (e.error === 'no-speech') return;
+      stopMic();
+      document.getElementById('mic-status').textContent = '⚠️ 오류: ' + e.error;
+    };
+
+    recognition.start();
+    isRecording = true;
+    document.getElementById('mic-btn').classList.add('recording');
+    document.getElementById('mic-btn').textContent = '⏹️ 녹음 중지';
+    document.getElementById('mic-status').textContent = '🔴 음성 인식 중... 말해보세요';
+  }
+
+  function stopMic() {
+    if (recognition) recognition.stop();
+    isRecording = false;
+    document.getElementById('mic-btn').classList.remove('recording');
+    document.getElementById('mic-btn').textContent = '🎙️ 음성 입력';
+    document.getElementById('mic-status').textContent = '✅ 음성 입력 완료';
+    setTimeout(() => { document.getElementById('mic-status').textContent = ''; }, 3000);
   }
 </script>
 </body>
