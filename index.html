@@ -175,7 +175,12 @@ ${raw}
     document.getElementById('loading').style.display = 'none';
   }
 
+  let lastResult = null;
+  let lastMeta = null;
+
   function renderResult(data, meta) {
+    lastResult = data;
+    lastMeta = meta;
     const headerEl = document.getElementById('header-info');
     const chips = [];
     if (meta.title) chips.push(`<span class="chip">📋 ${meta.title}</span>`);
@@ -253,8 +258,64 @@ ${raw}
   }
 
   function copyResult() {
-    const card = document.getElementById('result-card');
-    const text = card.innerText.replace(/⎘ 전체 복사/g, '').trim();
+    if (!lastResult) return;
+    const data = lastResult;
+    const meta = lastMeta;
+    let lines = [];
+
+    // 메타 정보
+    const metaParts = [];
+    if (meta.title) metaParts.push(`📋 ${meta.title}`);
+    if (meta.date) metaParts.push(`📅 ${meta.date}`);
+    if (meta.attendees) metaParts.push(`👥 ${meta.attendees}`);
+    if (metaParts.length) lines.push(metaParts.join('  '), '');
+
+    // 한줄 요약
+    if (data.overview) {
+      lines.push(`📌 한줄 요약`, data.overview, '');
+    }
+
+    // 주제별 정리
+    if (data.topics?.length) {
+      data.topics.forEach((topic, i) => {
+        lines.push(`📂 ${i + 1}. ${topic.title}`);
+        if (topic.sub_items?.length) {
+          topic.sub_items.forEach((sub, j) => {
+            lines.push('');
+            lines.push(`  ${j + 1}) ${sub.label}`);
+            if (sub.details?.length) {
+              sub.details.forEach((d, k) => {
+                const circle = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩'][k] || `${k+1}`;
+                lines.push(`    ${circle} ${d}`);
+              });
+            }
+            if (sub.key_point) {
+              lines.push(`    💡 핵심: ${sub.key_point}`);
+            }
+          });
+        }
+        lines.push('');
+      });
+    }
+
+    // 해야 할 일
+    if (data.action_items?.length) {
+      lines.push(`✅ 해야 할 일`);
+      data.action_items.forEach(a => {
+        let line = `  • ${a.task}`;
+        if (a.owner) line += `  👤 ${a.owner}`;
+        if (a.due) line += `  📅 ${a.due}`;
+        lines.push(line);
+      });
+      lines.push('');
+    }
+
+    // 후속 조치
+    if (data.next_steps) {
+      lines.push(`🔜 후속 조치`, data.next_steps);
+    }
+
+    const text = lines.join('\n').trim();
     navigator.clipboard.writeText(text).then(() => {
       const btn = document.querySelector('.copy-btn');
       btn.textContent = '✓ 복사됨';
