@@ -37,8 +37,6 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   #loading { display: none; align-items: center; gap: 8px; font-size: 13px; color: #888; padding: 1rem 0; }
   #output { display: none; }
-
-  /* 결과 스타일 */
   .result-pre { font-family: inherit; font-size: 14px; line-height: 1.8; white-space: pre-wrap; word-break: break-word; }
   .topic-block { margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 0.5px solid #eee; }
   .topic-block:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
@@ -147,7 +145,8 @@ ${raw}
 - 각 주제 안에서 세부 항목(sub_items)으로 분류하라
 - 각 세부 항목에 구체적 내용(details)과 핵심(key_point)을 반드시 넣어라
 - 결정된 할일은 action_items에 별도 정리하라
-- 내용을 빠뜨리지 말고 구체적으로 정리하라`;
+- 회의 내용에 없는 말을 절대 만들어내지 마라. 원문에 있는 내용만 정리하라
+- 추측이나 해석을 더하지 말고, 있는 그대로만 정리하라`;
 
     try {
       const res = await fetch('/api/summarize', {
@@ -178,19 +177,17 @@ ${raw}
     const body = document.getElementById('result-body');
     let html = '';
 
-    // 한줄 요약
     if (data.overview) {
       html += `<div class="summary-section">
-        <p class="section-label">한줄 요약</p>
+        <p class="section-label">📌 한줄 요약</p>
         <p class="summary-text">${data.overview}</p>
       </div>`;
     }
 
-    // 주제별 정리
     if (data.topics?.length) {
       data.topics.forEach((topic, i) => {
         html += `<div class="topic-block">`;
-        html += `<div class="topic-num">${i + 1}. ${topic.title}</div>`;
+        html += `<div class="topic-num">📂 ${i + 1}. ${topic.title}</div>`;
         if (topic.sub_items?.length) {
           topic.sub_items.forEach((sub, j) => {
             html += `<div class="sub-item">${j + 1}) ${sub.label}</div>`;
@@ -201,7 +198,7 @@ ${raw}
               });
             }
             if (sub.key_point) {
-              html += `<div class="key-point">핵심: ${sub.key_point}</div>`;
+              html += `<div class="key-point">💡 핵심: ${sub.key_point}</div>`;
             }
           });
         }
@@ -209,10 +206,9 @@ ${raw}
       });
     }
 
-    // 액션 아이템
     if (data.action_items?.length) {
       html += `<div class="action-section">
-        <p class="section-label">액션 아이템</p>`;
+        <p class="section-label">✅ 해야 할 일</p>`;
       data.action_items.forEach(a => {
         html += `<div class="action-row">
           <span class="action-task">• ${a.task}</span>
@@ -223,10 +219,9 @@ ${raw}
       html += `</div>`;
     }
 
-    // 후속 조치
     if (data.next_steps) {
       html += `<div class="action-section">
-        <p class="section-label">후속 조치</p>
+        <p class="section-label">🔜 후속 조치</p>
         <p class="summary-text">${data.next_steps}</p>
       </div>`;
     }
