@@ -29,12 +29,6 @@
   .btn:active { transform: scale(0.98); }
   .btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .btn-row { display: flex; gap: 8px; margin-top: 10px; }
-  .section-title { font-size: 11px; font-weight: 500; color: #888; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 8px; }
-  .section-block { margin-bottom: 1.25rem; padding-bottom: 1.25rem; border-bottom: 0.5px solid #eee; }
-  .section-block:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
-  .result-text { font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
-  ul { padding-left: 1.2rem; }
-  li { font-size: 14px; line-height: 1.7; margin-bottom: 3px; }
   .header-info { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 1.25rem; padding-bottom: 1.25rem; border-bottom: 0.5px solid #eee; }
   .chip { font-size: 12px; color: #888; }
   .copy-btn { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: #888; cursor: pointer; border: 0.5px solid #ddd; border-radius: 8px; padding: 4px 10px; background: none; margin-top: 1rem; font-family: inherit; transition: background 0.15s; }
@@ -43,8 +37,23 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   #loading { display: none; align-items: center; gap: 8px; font-size: 13px; color: #888; padding: 1rem 0; }
   #output { display: none; }
-  .action-item { margin-bottom: 8px; }
-  .action-meta { font-size: 12px; color: #aaa; margin-top: 2px; }
+
+  /* 결과 스타일 */
+  .result-pre { font-family: inherit; font-size: 14px; line-height: 1.8; white-space: pre-wrap; word-break: break-word; }
+  .topic-block { margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 0.5px solid #eee; }
+  .topic-block:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .topic-num { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+  .sub-item { margin-left: 1rem; margin-bottom: 4px; font-size: 14px; line-height: 1.7; }
+  .detail-item { margin-left: 2rem; margin-bottom: 3px; font-size: 13px; line-height: 1.7; color: #444; }
+  .key-point { margin-left: 1rem; margin-top: 6px; padding: 6px 10px; background: #faf8f5; border-left: 3px solid #d4a574; font-size: 13px; line-height: 1.6; color: #333; border-radius: 0 6px 6px 0; }
+  .summary-section { margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 0.5px solid #eee; }
+  .section-label { font-size: 11px; font-weight: 500; color: #888; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 8px; }
+  .summary-text { font-size: 14px; line-height: 1.7; }
+  .action-section { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 0.5px solid #eee; }
+  .action-row { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; font-size: 13px; }
+  .action-task { flex: 1; }
+  .action-owner { color: #888; white-space: nowrap; }
+  .action-due { color: #888; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -106,20 +115,39 @@
       attendees ? `참석자: ${attendees}` : ''
     ].filter(Boolean).join('\n');
 
-    const prompt = `다음 회의 내용을 아래 형식으로 정리해줘. 반드시 JSON만 반환하고 마크다운 코드블록이나 다른 텍스트는 절대 포함하지 마.
+    const prompt = `너는 회의록 정리 전문가야. 다음 회의 내용을 주제별로 체계적으로 정리해줘.
+반드시 JSON만 반환하고 마크다운 코드블록이나 다른 텍스트는 절대 포함하지 마.
 
 ${metaPart ? '【메타 정보】\n' + metaPart + '\n\n' : ''}【회의 내용】
 ${raw}
 
 반환 형식 (JSON):
 {
-  "summary": "회의 전체 요약 (3~5문장)",
-  "agenda": ["안건1", "안건2"],
-  "decisions": ["결정사항1", "결정사항2"],
-  "action_items": [{"task": "할일", "owner": "담당자 (없으면 공란)", "due": "기한 (없으면 공란)"}],
-  "issues": ["이슈 또는 보류 사항 (없으면 빈 배열)"],
-  "next_meeting": "다음 회의 관련 내용 (없으면 공란)"
-}`;
+  "overview": "전체 회의 한줄 요약",
+  "topics": [
+    {
+      "title": "주제명 (예: 마케팅 전략)",
+      "sub_items": [
+        {
+          "label": "세부 항목명",
+          "details": ["구체적 내용1", "구체적 내용2"],
+          "key_point": "이 항목의 핵심 (한 문장)"
+        }
+      ]
+    }
+  ],
+  "action_items": [
+    {"task": "할일", "owner": "담당자 (없으면 빈 문자열)", "due": "기한 (없으면 빈 문자열)"}
+  ],
+  "next_steps": "후속 조치 또는 다음 회의 관련 사항 (없으면 빈 문자열)"
+}
+
+규칙:
+- 회의 내용에서 주제를 추출해서 topics 배열로 나눠라
+- 각 주제 안에서 세부 항목(sub_items)으로 분류하라
+- 각 세부 항목에 구체적 내용(details)과 핵심(key_point)을 반드시 넣어라
+- 결정된 할일은 action_items에 별도 정리하라
+- 내용을 빠뜨리지 말고 구체적으로 정리하라`;
 
     try {
       const res = await fetch('/api/summarize', {
@@ -145,22 +173,63 @@ ${raw}
     if (meta.attendees) chips.push(`<span class="chip">👥 ${meta.attendees}</span>`);
     headerEl.innerHTML = chips.join('');
     if (!chips.length) headerEl.style.display = 'none';
+    else headerEl.style.display = 'flex';
 
     const body = document.getElementById('result-body');
     let html = '';
-    if (data.summary) html += block('요약', `<p class="result-text">${data.summary}</p>`);
-    if (data.agenda?.length) html += block('안건', list(data.agenda));
-    if (data.decisions?.length) html += block('결정사항', list(data.decisions));
-    if (data.action_items?.length) {
-      const rows = data.action_items.map(a => `
-        <div class="action-item">
-          <div style="font-size:14px">${a.task}</div>
-          <div class="action-meta">${a.owner ? '담당: ' + a.owner : ''}${a.owner && a.due ? ' · ' : ''}${a.due ? '기한: ' + a.due : ''}</div>
-        </div>`).join('');
-      html += block('액션 아이템', rows);
+
+    // 한줄 요약
+    if (data.overview) {
+      html += `<div class="summary-section">
+        <p class="section-label">한줄 요약</p>
+        <p class="summary-text">${data.overview}</p>
+      </div>`;
     }
-    if (data.issues?.length) html += block('이슈 / 보류', list(data.issues));
-    if (data.next_meeting) html += block('다음 회의', `<p class="result-text">${data.next_meeting}</p>`);
+
+    // 주제별 정리
+    if (data.topics?.length) {
+      data.topics.forEach((topic, i) => {
+        html += `<div class="topic-block">`;
+        html += `<div class="topic-num">${i + 1}. ${topic.title}</div>`;
+        if (topic.sub_items?.length) {
+          topic.sub_items.forEach((sub, j) => {
+            html += `<div class="sub-item">${j + 1}) ${sub.label}</div>`;
+            if (sub.details?.length) {
+              sub.details.forEach((d, k) => {
+                const circle = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩'][k] || `${k+1}`;
+                html += `<div class="detail-item">${circle} ${d}</div>`;
+              });
+            }
+            if (sub.key_point) {
+              html += `<div class="key-point">핵심: ${sub.key_point}</div>`;
+            }
+          });
+        }
+        html += `</div>`;
+      });
+    }
+
+    // 액션 아이템
+    if (data.action_items?.length) {
+      html += `<div class="action-section">
+        <p class="section-label">액션 아이템</p>`;
+      data.action_items.forEach(a => {
+        html += `<div class="action-row">
+          <span class="action-task">• ${a.task}</span>
+          ${a.owner ? `<span class="action-owner">👤 ${a.owner}</span>` : ''}
+          ${a.due ? `<span class="action-due">📅 ${a.due}</span>` : ''}
+        </div>`;
+      });
+      html += `</div>`;
+    }
+
+    // 후속 조치
+    if (data.next_steps) {
+      html += `<div class="action-section">
+        <p class="section-label">후속 조치</p>
+        <p class="summary-text">${data.next_steps}</p>
+      </div>`;
+    }
 
     body.innerHTML = html;
     document.getElementById('output').style.display = 'block';
@@ -168,12 +237,6 @@ ${raw}
     document.getElementById('summarize-btn').disabled = false;
   }
 
-  function block(title, content) {
-    return `<div class="section-block"><p class="section-title">${title}</p>${content}</div>`;
-  }
-  function list(items) {
-    return `<ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>`;
-  }
   function reset() {
     document.getElementById('raw-minutes').value = '';
     document.getElementById('meeting-title').value = '';
@@ -182,6 +245,7 @@ ${raw}
     document.getElementById('reset-btn').style.display = 'none';
     document.getElementById('header-info').style.display = 'flex';
   }
+
   function copyResult() {
     const card = document.getElementById('result-card');
     const text = card.innerText.replace(/⎘ 전체 복사/g, '').trim();
